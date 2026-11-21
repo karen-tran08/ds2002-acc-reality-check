@@ -14,7 +14,7 @@ We combine Bart Torvik's team ratings with ESPN game results and box scores, sto
 ## Links
 
 - **Final notebook:** [`ACC Reality Check.ipynb`](ACC%20Reality%20Check.ipynb) <!-- TODO: match the final notebook's file name -->
-- **Live API:** https://USERNAME.pythonanywhere.com (interactive docs at [`/docs`](https://USERNAME.pythonanywhere.com/docs)) <!-- TODO -->
+- **Live API:** https://USERNAME.pythonanywhere.com (interactive docs at [`/docs`](https://thecleaners.pythonanywhere.com/docs)) <!-- TODO -->
 - **Presentation video:** TODO: add the link (test it in a private browser window)
 - **Reflection:** Section 7 at the end of the final notebook
 
