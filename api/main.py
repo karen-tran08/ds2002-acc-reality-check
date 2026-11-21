@@ -13,8 +13,8 @@ DB_PATH = Path(os.environ.get('ACC_DB') or next(
 app = FastAPI(title='ACC Reality Check',
               description="ACC men's basketball: records vs. ratings. Data from Bart Torvik and ESPN.")
 
-LEADER_STATS = {'points': 'points', 'rebounds': 'reb', 'assists': 'ast',
-                'steals': 'stl', 'blocks': 'blk'}
+LEADER_STATS = {'points': 'points', 'rebounds': 'rebounds', 'assists': 'assists',
+                'steals': 'steals', 'blocks': 'blocks'}
 
 
 def query(sql, params=()):
@@ -123,8 +123,8 @@ def games(date: str = Query(..., description='Eastern date, YYYY-MM-DD')):
     rows = query("""SELECT g.game_id, g.game_date_et AS date, h.espn_name AS home, g.home_score,
                            a.espn_name AS away, g.away_score, g.neutral_site
                     FROM games g
-                    JOIN teams h ON h.espn_id = g.home_espn_id
-                    JOIN teams a ON a.espn_id = g.away_espn_id
+                    JOIN teams h ON h.espn_id = g.home_id
+                    JOIN teams a ON a.espn_id = g.away_id
                     WHERE g.game_date_et = ?
                     ORDER BY g.start_utc""", (date,))
     return {'date': date, 'count': len(rows), 'games': rows}
