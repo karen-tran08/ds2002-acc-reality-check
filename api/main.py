@@ -38,14 +38,14 @@ WITH rec AS (
 opp AS (
     SELECT tg.espn_id, ROUND(AVG(ro.barthag), 3) AS avg_opp_barthag
     FROM team_games tg
-    JOIN teams o ON o.espn_id = tg.opponent_id
+    JOIN team_crosswalk o ON o.espn_id = tg.opponent_id
     LEFT JOIN ratings ro ON ro.torvik_name = o.torvik_name AND ro.snapshot_date = ?
     GROUP BY tg.espn_id
 )
 SELECT t.espn_id, t.espn_name AS team, rec.games, rec.wins, rec.games - rec.wins AS losses,
        ROUND(1.0 * rec.wins / rec.games, 3) AS win_pct, rec.avg_margin,
        ROUND(r.adjoe - r.adjde, 1) AS eff_margin, r.barthag, opp.avg_opp_barthag
-FROM teams t
+FROM team_crosswalk t
 JOIN rec USING (espn_id)
 JOIN opp USING (espn_id)
 JOIN ratings r ON r.torvik_name = t.torvik_name AND r.snapshot_date = ?
@@ -73,10 +73,12 @@ def add_labels(rows):
 
 
 def find_team(name):
-    """Match any spelling we know (ESPN location, ESPN short name, Torvik name), ignoring case."""
-    rows = query("""SELECT DISTINCT t.espn_id, t.espn_name, t.torvik_name, t.is_acc
-                    FROM team_crosswalk c JOIN teams t ON t.espn_id = c.espn_id
-                    WHERE LOWER(c.source_name) = LOWER(?)""", (name.strip(),))
+    """Match any spelling we know (ESPN name, ESPN short name, Torvik name), ignoring case."""
+    name = name.strip()
+    rows = query("""SELECT espn_id, espn_name, torvik_name, is_acc
+                    FROM team_crosswalk
+                    WHERE LOWER(espn_name) = LOWER(?) OR LOWER(espn_short) = LOWER(?)
+                       OR LOWER(torvik_name) = LOWER(?)""", (name, name, name))
     if not rows:
         raise HTTPException(status_code=404, detail=f'Unknown team: {name}')
     return rows[0]
@@ -109,7 +111,7 @@ def team_detail(team: str):
         raise HTTPException(status_code=404, detail=f'{t["espn_name"]} is not an ACC team')
     last5 = query("""SELECT tg.game_date_et AS date, o.espn_name AS opponent, tg.site,
                             tg.points_for, tg.points_against, tg.margin
-                     FROM team_games tg JOIN teams o ON o.espn_id = tg.opponent_id
+                     FROM team_games tg JOIN team_crosswalk o ON o.espn_id = tg.opponent_id
                      WHERE tg.espn_id = ?
                      ORDER BY tg.game_date_et DESC, tg.game_id DESC LIMIT 5""", (t['espn_id'],))
     return {'ratings_snapshot': snap, 'summary': summary, 'last_five_games': last5}
@@ -123,8 +125,8 @@ def games(date: str = Query(..., description='Eastern date, YYYY-MM-DD')):
     rows = query("""SELECT g.game_id, g.game_date_et AS date, h.espn_name AS home, g.home_score,
                            a.espn_name AS away, g.away_score, g.neutral_site
                     FROM games g
-                    JOIN teams h ON h.espn_id = g.home_id
-                    JOIN teams a ON a.espn_id = g.away_id
+                    JOIN team_crosswalk h ON h.espn_id = g.home_espn_id
+                    JOIN team_crosswalk a ON a.espn_id = g.away_espn_id
                     WHERE g.game_date_et = ?
                     ORDER BY g.start_utc""", (date,))
     return {'date': date, 'count': len(rows), 'games': rows}
@@ -151,15 +153,9 @@ def matchup(a: str, b: str):
 
 @app.get('/leaders')
 def leaders(stat: str = 'points', limit: int = Query(10, ge=1, le=50)):
-    """ACC players ranked by a per-game stat. Unknown stat -> 400."""
+    """ACC players ranked by a per-game stat. Not available until player box scores are pulled."""
     if stat not in LEADER_STATS:
         raise HTTPException(status_code=400,
                             detail=f'stat must be one of: {", ".join(LEADER_STATS)}')
-    col = LEADER_STATS[stat]   # column name comes from our own whitelist, never from the request
-    rows = query(f"""SELECT pg.player_name AS player, t.espn_name AS team, COUNT(*) AS games,
-                            ROUND(1.0 * SUM(pg.{col}) / COUNT(*), 1) AS per_game
-                     FROM player_games pg JOIN teams t ON t.espn_id = pg.espn_id
-                     WHERE t.is_acc = 1
-                     GROUP BY pg.player_id
-                     ORDER BY per_game DESC LIMIT ?""", (limit,))
-    return {'stat': stat, 'leaders': rows}
+    raise HTTPException(status_code=501,
+                        detail='Player box scores have not been pulled yet; /leaders is not available.')
